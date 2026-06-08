@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор UTM-меток — Zerocoder</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f0f2f5;
+  color: #1a1a1a;
+  padding: 28px 20px;
+  min-height: 100vh;
+}
+
+.container { max-width: 720px; margin: 0 auto; }
+
+h1 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: #111;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+
+.card-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #888;
+  margin-bottom: 14px;
+}
+
+label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 5px;
+}
+
+input[type="text"], select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 7px;
+  font-size: 0.92rem;
+  color: #111;
+  background: white;
+  transition: border-color 0.15s;
+  appearance: none;
+}
+
+input[type="text"]:focus, select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+
+.result-box {
+  background: #f5f3ff;
+  border: 1.5px solid #c4b5fd;
+  border-radius: 8px;
+  padding: 14px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+  color: #3730a3;
+  min-height: 48px;
+  line-height: 1.6;
+}
+
+.result-placeholder { color: #a5b4fc; font-style: italic; font-family: inherit; }
+
+.btn-copy {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-copy:hover { background: #4f46e5; }
+.btn-copy:active { background: #4338ca; }
+.btn-copy.ok { background: #10b981; }
+
+.params-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  font-size: 0.8rem;
+  margin-top: 16px;
+  border: 1px solid #ede9fe;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.params-grid .ph { background: #faf5ff; padding: 6px 10px; font-weight: 600; color: #7c3aed; border-bottom: 1px solid #ede9fe; }
+.params-grid .pv { padding: 6px 10px; border-bottom: 1px solid #ede9fe; font-family: monospace; font-size: 0.78rem; color: #374151; }
+.params-grid > *:nth-last-child(-n+2) { border-bottom: none; }
+.params-grid .empty-val { color: #ccc; }
+
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Генератор UTM-меток</h1>
+
+<!-- URL -->
+<div class="card">
+  <div class="card-title">Базовый URL</div>
+  <div class="field">
+    <label>Ссылка на страницу</label>
+    <input type="text" id="baseUrl" placeholder="https://zerocoder.ru/..." oninput="generate()">
+  </div>
+</div>
+
+<!-- Section + Channel -->
+<div class="card">
+  <div class="card-title">Раздел и канал</div>
+  <div class="row2">
+    <div class="field">
+      <label>Раздел</label>
+      <select id="section" onchange="onSectionChange()">
+        <option value="">— выбрать —</option>
+        <option value="announce">Анонсы</option>
+        <option value="funnel">Воронка вебинара</option>
+        <option value="promo">Внешние выступления</option>
+        <option value="blog">Блог</option>
+        <option value="ads">Реклама</option>
+        <option value="gc">В Геткурсе</option>
+        <option value="guide">Гайды</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Канал / тип</label>
+      <select id="channel" onchange="onChannelChange()">
+        <option value="">— выбрать —</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Variable fields -->
+<div class="card hidden" id="varsCard">
+  <div class="card-title">Переменные поля</div>
+  <div id="varFields"></div>
+</div>
+
+<!-- Result -->
+<div class="card">
+  <div class="card-title">Результат</div>
+  <div class="result-box" id="result"><span class="result-placeholder">Заполните поля выше</span></div>
+  <button class="btn-copy" id="copyBtn" onclick="copyResult()">Скопировать</button>
+  <div class="params-grid hidden" id="paramsGrid">
+    <div class="ph">Параметр</div><div class="ph">Значение</div>
+    <div class="pv">utm_source</div><div class="pv" id="pg_source"></div>
+    <div class="pv">utm_medium</div><div class="pv" id="pg_medium"></div>
+    <div class="pv">utm_campaign</div><div class="pv" id="pg_campaign"></div>
+    <div class="pv">utm_content</div><div class="pv" id="pg_content"></div>
+    <div class="pv">utm_term</div><div class="pv" id="pg_term"></div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+// Each channel:
+//   source, medium — always fixed
+//   campaign, content, term — if string → fixed value ('' = skip param)
+//                             if undefined → taken from vars
+//   vars — array of var keys for user input fields
+
+const sections = {
+  announce: {
+    label: "Анонсы",
+    channels: [
+      { name: "Почта",                       source: "email",       medium: "zerocoder",         content: "announce", vars: ["campaign","term_date"] },
+      { name: "Телеграм бот (ГК)",            source: "telegram",    medium: "zerocoder-gc",      content: "announce", vars: ["campaign","term_date"] },
+      { name: "Телеграм бот (воронки)",        source: "telegram",    medium: "zerocodity",        content: "announce", vars: ["campaign","term_date"] },
+      { name: "Помощник по безопасности",     source: "telegram",    medium: "antiscam_zero",     content: "announce", vars: ["campaign","term_date"] },
+      { name: "Нейрокот",                     source: "{utm}",       medium: "neurocat",          content: "announce", vars: ["campaign","term_date"] },
+      { name: "Max",                           source: "max",         medium: "zerocoder",         content: "announce", vars: ["campaign","term_date"] },
+      { name: "Пуш",                           source: "app",         medium: "zerocoder",         content: "announce", vars: ["campaign","term_date"] },
+      { name: "Телеграм канал",                source: "telegram",    medium: "channel_oqode",     content: "announce", vars: ["campaign","term_date"] },
+      { name: "Инстаграм",                     source: "instagram",   medium: "zerocoder",         content: "announce", vars: ["campaign","term_date"] },
+      { name: "Нейросетевые покои",            source: "telegram",    medium: "pokoi",             content: "announce", vars: ["campaign","term_date"] },
+      { name: "YouTube",                       source: "yt",          medium: "",  campaign: "",   content: "", term: "", vars: [] },
+      { name: "Тесты Зерокодер",              source: "telegram",    medium: "zerocoder_it_test", content: "announce", vars: ["campaign","term_date"] },
+    ]
+  },
+  funnel: {
+    label: "Воронка вебинара",
+    channels: [
+      { name: "Почта — Продажное письмо",        source: "email",    medium: "zerocoder",    content: "funnel",        vars: ["campaign","term_message"] },
+      { name: "Почта — Вход на вебинар",          source: "",         medium: "",             campaign: "", content: "email",         term: "", vars: [] },
+      { name: "Телеграм бот — Продажное письмо", source: "telegram", medium: "bot_zerocoder",content: "funnel",        vars: ["campaign","term_message"] },
+      { name: "Телеграм бот — Вход на вебинар",  source: "",         medium: "",             campaign: "", content: "telegram",      term: "", vars: [] },
+      { name: "Телеграм бот — Шальной",          source: "",         medium: "",             campaign: "", content: "telegram-baza", term: "", vars: [] },
+      { name: "Max — Продажное письмо",          source: "max",      medium: "bot_zerocoder",content: "funnel",        vars: ["campaign","term_message"] },
+      { name: "Max — Вход на вебинар",           source: "",         medium: "",             campaign: "", content: "max",           term: "", vars: [] },
+      { name: "СМС — Вход на вебинар",           source: "",         medium: "",             campaign: "", content: "sms",           term: "", vars: [] },
+      { name: "Телеграм-канал — Шальной",        source: "",         medium: "",             content: "channel_oqode", vars: ["campaign"] },
+      { name: "Нейросетевые покои — Шальной",    source: "",         medium: "",             content: "pokoi",         vars: ["campaign"] },
+      { name: "Инстаграм — Шальной",             source: "",         medium: "",             content: "instagram",     vars: ["campaign"] },
+      { name: "Нейрокот — Шальной",              source: "",         medium: "",             content: "neurocat-{utm}",vars: ["campaign"] },
+    ]
+  },
+  promo: {
+    label: "Внешние выступления",
+    channels: [
+      { name: "Спикерство", source: "pr", medium: "speech",  vars: ["campaign_partner","content_speaker","term_date"] },
+      { name: "Подкаст",    source: "pr", medium: "podcast", vars: ["campaign_partner","content_speaker","term_date"] },
+    ]
+  },
+  blog: {
+    label: "Блог",
+    channels: [
+      { name: "Статья",   source: "magazine", medium: "article", vars: ["campaign","content_url","term_date"] },
+      { name: "Баннер",   source: "magazine", medium: "banner",  vars: ["campaign","content_url","term_date"] },
+      { name: "Pop-up",   source: "magazine", medium: "pop-up",  vars: ["campaign","content_url","term_date"] },
+    ]
+  },
+  ads: {
+    label: "Реклама",
+    channels: [
+      { name: "Яндекс Вика (source: Yandex_vika_kab2)", source: "Yandex_vika_kab2", medium: "cpc",        campaign: "{campaign_id}", content: "{ad_id}", term: "{keyword}", vars: [] },
+      { name: "Яндекс Вика (source: Yandex_vika_kab3)", source: "Yandex_vika_kab3", medium: "cpc",        campaign: "{campaign_id}", content: "{ad_id}", term: "{keyword}", vars: [] },
+      { name: "Яндекс Вика (source: Yandex_vika)",      source: "Yandex_vika",      medium: "cpc",        campaign: "{campaign_id}", content: "{ad_id}", term: "{keyword}", vars: [] },
+      { name: "Яндекс Вика (yandex / kab2)",            source: "yandex",           medium: "vika_кab2",  campaign: "{campaign_id}", content: "{ad_id}", term: "{keyword}", vars: [] },
+      { name: "Яндекс Вика (yandex / kab3)",            source: "yandex",           medium: "vika_кab3",  campaign: "{campaign_id}", content: "{ad_id}", term: "{keyword}", vars: [] },
+      { name: "ТГ Ads Вика",                            source: "tg_ads",           medium: "vika",       vars: ["campaign_event","content_audience","term_offer"] },
+      { name: "Google Влад",                            source: "google",           medium: "cpc",        vars: ["campaign"] },
+      { name: "Facebook Влад",                          source: "fb",               medium: "cpc",        vars: ["campaign"] },
+      { name: "Facebook Вика",                          source: "vika_fb_Mir",      medium: "динамичная", campaign: "{{adset.name}}", content: "{{ad.name}}", term: "", vars: [] },
+      { name: "Instagram Влад",                         source: "ig",               medium: "cpc",        vars: ["campaign"] },
+      { name: "VK МП (посевы)",                         source: "vk_pos",           medium: "valeriy",    content: "", term: "", vars: ["campaign_vk_id"] },
+      { name: "Facebook Валерий",                       source: "fb",               medium: "valeriy",    campaign: "{{adset_id}}", content: "{{ad_id}}", term: "", vars: [] },
+      { name: "Яндекс Дмитрий",                        source: "yandex.direct",    medium: "erashovdm",  vars: ["campaign"] },
+      { name: "Яндекс Александр",                      source: "yandex",           medium: "soldatov",   vars: ["campaign"] },
+      { name: "ТГ посевы Александр",                    source: "tg",               medium: "aaa-digital",vars: ["campaign"] },
+      { name: "ФБ Владимир",                           source: "fb",               medium: "v-koff",     vars: ["campaign"] },
+      { name: "ФБ Филипп",                             source: "fb",               medium: "metapr",     vars: ["campaign"] },
+      { name: "ФБ Роман",                              source: "fb",               medium: "roman01",    vars: ["campaign"] },
+      { name: "Гайд",                                  source: "gaid",                                   content: "funnel", vars: ["medium_guide","campaign"] },
+    ]
+  },
+  gc: {
+    label: "В Геткурсе",
+    channels: [
+      { name: "Все тренинги",          source: "getcourse", medium: "zerocoder", campaign: "training", content: "", term: "", vars: [] },
+      { name: "Запись вебинара",       source: "site",      medium: "getcourse", content: "record",  vars: ["campaign_webinar"] },
+      { name: "Интенсив / Урок",       source: "site",      medium: "getcourse", content: "lesson",  vars: ["campaign_course"] },
+      { name: "Урок платного курса",   source: "site",      medium: "getcourse", vars: ["campaign_course","content_lesson"] },
+      { name: "Баннер",                source: "site",      medium: "getcourse", content: "banner",  vars: ["campaign"] },
+    ]
+  },
+  guide: {
+    label: "Гайды",
+    channels: [
+      { name: "Почта",        source: "email",    medium: "zerocoder",    content: "guide", vars: ["campaign_guide"] },
+      { name: "Телеграм бот", source: "telegram", medium: "bot_zerocoder",content: "guide", vars: ["campaign_guide"] },
+      { name: "ВК бот",       source: "vk",       medium: "zerocoders",   content: "guide", vars: ["campaign_guide"] },
+    ]
+  }
+};
+
+const varDefs = {
+  campaign:          { label: "Тег активности",                     ph: "например: webinar-ai-may26",   key: "campaign" },
+  campaign_guide:    { label: "Тег гайда",                          ph: "например: guide-chatgpt",       key: "campaign" },
+  campaign_webinar:  { label: "Тег вебинара",                       ph: "например: webinar-n8n",         key: "campaign" },
+  campaign_course:   { label: "Тег курса",                          ph: "например: course-zerocoder",    key: "campaign" },
+  campaign_partner:  { label: "Партнёр / вебинар / тег активности", ph: "например: skillbox-webinar",   key: "campaign" },
+  campaign_event:    { label: "Мероприятие (utm_campaign)",         ph: "например: webinar-ai",          key: "campaign" },
+  campaign_vk_id:    { label: "ID паблика ВК (utm_campaign)",       ph: "например: 123456789",           key: "campaign" },
+  medium_guide:      { label: "Тег гайда (utm_medium)",             ph: "например: guide-chatgpt",       key: "medium"   },
+  content_speaker:   { label: "Спикер (utm_content)",               ph: "например: ivanova",             key: "content"  },
+  content_url:       { label: "URL / название статьи (utm_content)", ph: "например: chatgpt-guide",     key: "content"  },
+  content_lesson:    { label: "Тег урока (utm_content)",            ph: "например: lesson-01",           key: "content"  },
+  content_audience:  { label: "ЦА (utm_content)",                   ph: "например: smm-managers",       key: "content"  },
+  term_date:         { label: "Дата (дд.мм.гг)",                    ph: "например: 15.05.26",            key: "term",    transform: v => v },
+  term_message:      { label: "Номер письма",                       ph: "например: 3  →  message-3",    key: "term",    transform: v => "message-" + v },
+  term_offer:        { label: "Оффер (utm_term)",                   ph: "например: бесплатный-вебинар", key: "term"     },
+};
+
+// ─── UI ─────────────────────────────────────────────────────────────────────
+
+function onSectionChange() {
+  const sectionKey = document.getElementById('section').value;
+  const channelSel = document.getElementById('channel');
+  channelSel.innerHTML = '<option value="">— выбрать —</option>';
+
+  if (sectionKey && sections[sectionKey]) {
+    sections[sectionKey].channels.forEach((ch, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = ch.name;
+      channelSel.appendChild(opt);
+    });
+  }
+  onChannelChange();
+}
+
+function onChannelChange() {
+  const sectionKey = document.getElementById('section').value;
+  const chIdx = document.getElementById('channel').value;
+  const varsCard = document.getElementById('varsCard');
+  const varFields = document.getElementById('varFields');
+
+  varFields.innerHTML = '';
+
+  if (!sectionKey || chIdx === '') {
+    varsCard.classList.add('hidden');
+    generate();
+    return;
+  }
+
+  const ch = sections[sectionKey].channels[parseInt(chIdx)];
+  if (!ch.vars || ch.vars.length === 0) {
+    varsCard.classList.add('hidden');
+    generate();
+    return;
+  }
+
+  varsCard.classList.remove('hidden');
+
+  ch.vars.forEach(varKey => {
+    const def = varDefs[varKey] || { label: varKey, ph: '', key: varKey };
+    const div = document.createElement('div');
+    div.className = 'field';
+    div.innerHTML = `<label>${def.label}</label><input type="text" id="v_${varKey}" placeholder="${def.ph}" oninput="generate()">`;
+    varFields.appendChild(div);
+  });
+
+  generate();
+}
+
+// ─── GENERATE ────────────────────────────────────────────────────────────────
+
+function getVal(varKey) {
+  const el = document.getElementById('v_' + varKey);
+  return el ? el.value.trim() : '';
+}
+
+function resolveParam(ch, paramName) {
+  // If fixed value defined on channel (including empty string), return it
+  if (ch[paramName] !== undefined) return ch[paramName];
+  // Otherwise look in vars
+  const def = (ch.vars || []).find(v => (varDefs[v] || {}).key === paramName);
+  if (!def) return undefined;
+  const raw = getVal(def);
+  if (!raw) return '';
+  const transform = (varDefs[def] || {}).transform;
+  return transform ? transform(raw) : raw;
+}
+
+function generate() {
+  const sectionKey = document.getElementById('section').value;
+  const chIdx = document.getElementById('channel').value;
+  const baseUrl = document.getElementById('baseUrl').value.trim();
+  const resultEl = document.getElementById('result');
+
+  if (!sectionKey || chIdx === '') {
+    resultEl.innerHTML = '<span class="result-placeholder">Выберите раздел и канал</span>';
+    document.getElementById('paramsGrid').classList.add('hidden');
+    return;
+  }
+
+  const ch = sections[sectionKey].channels[parseInt(chIdx)];
+
+  const p = {
+    utm_source:   ch.source  || '',
+    utm_medium:   ch.medium !== undefined ? ch.medium : resolveParam(ch, 'medium') || '',
+    utm_campaign: resolveParam(ch, 'campaign'),
+    utm_content:  resolveParam(ch, 'content'),
+    utm_term:     resolveParam(ch, 'term'),
+  };
+
+  const parts = [];
+  ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(k => {
+    if (p[k] !== undefined && p[k] !== '') {
+      parts.push(k + '=' + encodeURIComponent(p[k]));
+    }
+  });
+
+  const base = baseUrl || 'https://...';
+  const sep = base.includes('?') ? '&' : '?';
+  const url = parts.length ? base + sep + parts.join('&') : base;
+
+  resultEl.textContent = url;
+
+  // Update params table
+  const grid = document.getElementById('paramsGrid');
+  grid.classList.remove('hidden');
+  ['source','medium','campaign','content','term'].forEach(k => {
+    const el = document.getElementById('pg_' + k);
+    const val = p['utm_' + k];
+    if (val) {
+      el.textContent = val;
+      el.classList.remove('empty-val');
+    } else {
+      el.innerHTML = '—';
+      el.classList.add('empty-val');
+    }
+  });
+}
+
+function copyResult() {
+  const text = document.getElementById('result').textContent;
+  if (!text || text.startsWith('Заполните') || text.startsWith('Выберите')) return;
+
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Скопировано ✓';
+    btn.classList.add('ok');
+    setTimeout(() => {
+      btn.textContent = 'Скопировать';
+      btn.classList.remove('ok');
+    }, 2000);
+  });
+}
+</script>
+</body>
+</html>
